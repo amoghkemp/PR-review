@@ -1,0 +1,38 @@
+{
+    "manifest_version": 3,
+    "name": "AI PR Reviewer",
+    "version": "1.0",
+
+    "permissions": [
+        "activeTab",
+        "storage"
+    ],
+
+    "host_permissions": [
+        "https://github.com/*",
+        "https://api.github.com/*"
+    ],
+
+    "background": {
+        "service_worker": "background.js"
+    },
+
+    "content_scripts": [
+        {
+            "matches": [
+                "https://github.com/*/pull/*"
+            ],
+            "js": [
+                "config.js",
+                "github.js",
+                "promptBuilder.js",
+                "providers/gemini.js",
+                "llm.js",
+                "content.js"
+            ],
+            "css": [
+                "styles.css"
+            ]
+        }
+    ]
+}
