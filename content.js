@@ -31,12 +31,12 @@ panel.innerHTML = `
         <option value="openrouter">OpenRouter</option>
     </select>
 
-    <label>GitHub token</label>
+    <label>Git token</label>
 
     <input
-        id="githubToken"
+        id="gitToken"
         type="password"
-        placeholder="GitHub Personal Access Token">
+        placeholder="Git Personal Access Token">
 
     <label>API Key</label>
 
@@ -82,16 +82,16 @@ resizeObserver.observe(panel);
 (async function loadSettings() {
     const settings = await chrome.storage.local.get([
         "provider",
-        "githubToken",
+        "gitToken",
         "apiKey"
     ]);
 
     if (settings.provider) {
         document.getElementById("provider").value = settings.provider;
     }
-    if (settings.githubToken) {
-        document.getElementById("githubToken").value =
-            settings.githubToken;
+    if (settings.gitToken) {
+        document.getElementById("gitToken").value =
+            settings.gitToken;
     }
 
     if (settings.apiKey) {
@@ -154,7 +154,7 @@ document
     .addEventListener("click", async () => {
         const settings = {
             provider: document.getElementById("provider").value,
-            githubToken: document.getElementById("githubToken").value,
+            gitToken: document.getElementById("gitToken").value,
             apiKey: document.getElementById("apiKey").value
         };
 
@@ -174,12 +174,12 @@ document
 
         const settings = await chrome.storage.local.get([
             "provider",
-            "githubToken",
+            "gitToken",
             "apiKey"
         ]);
 
 
-        if (!settings.githubToken || !settings.apiKey) {
+        if (!settings.gitToken || !settings.apiKey) {
 
             document.getElementById("result").innerText =
                 "Please configure your settings first.";
@@ -187,8 +187,15 @@ document
             return;
         }
 
-        console.log("Updating GitHub token");
-        GITHUB_TOKEN = settings.githubToken;
+        console.log("Updating Git token");
+        detectGitProvider(window.location.href);
+        if (GIT_PROVIDER === "github") {
+            GITHUB_TOKEN = settings.gitToken;
+        }
+        else{
+            GITLAB_TOKEN = settings.gitToken;
+        }
+        
 
         console.log("Updating provider");
         CONFIG.provider = settings.provider;
@@ -197,21 +204,11 @@ document
         CONFIG.providers[settings.provider].apiKey = settings.apiKey;
 
         try {
-            const pr = parsePullRequestURL(
-                window.location.href
-            );
+            const pr = parseReviewURL(window.location.href);
 
-            const pullRequest = await getPullRequest(
-                pr.owner,
-                pr.repo,
-                pr.number
-            );
+            const reviewData = await getReview(pr);
 
-            const files = await getChangedFiles(
-                pr.owner,
-                pr.repo,
-                pr.number
-            );
+            const files = await getReviewFiles(pr);
 
             const reviewFiles = [];
 
@@ -219,39 +216,57 @@ document
                 let original = null;
                 let modified = null;
 
-                if (file.status !== "added") {
-                    const data = await getFile(
-                        pr.owner,
-                        pr.repo,
-                        file.filename,
-                        pullRequest.base.sha
+                const path = GIT_PROVIDER === "github" ? file.filename : file.new_path;
+
+                const added = GIT_PROVIDER === "github" ? file.status === "added" : file.new_file;
+                if (!added) {
+                    const data = await getReviewFile(
+                        pr,
+                        path,
+                        GIT_PROVIDER === "github"
+                            ? reviewData.base.sha
+                            : reviewData.diff_refs.base_sha
                     );
 
-                    original = decodeContent(data);
+                    original = decodeFile(data);
                 }
 
-                if (file.status !== "removed") {
-                    const data = await getFile(
-                        pr.owner,
-                        pr.repo,
-                        file.filename,
-                        pullRequest.head.sha
+                const removed = GIT_PROVIDER === "github" ? file.status === "removed" : file.deleted_file;
+                if (!removed) {
+                    const data = await getReviewFile(
+                        pr,
+                        path,
+                        GIT_PROVIDER === "github"
+                            ? reviewData.head.sha
+                            : reviewData.diff_refs.head_sha
                     );
 
-                    modified = decodeContent(data);
+                    modified = decodeFile(data);
                 }
 
                 reviewFiles.push({
-                    path: file.filename,
-                    status: file.status,
-                    patch: file.patch,
+                    path,
+
+                    status:
+                        GIT_PROVIDER === "github"
+                            ? file.status
+                            : added
+                                ? "added"
+                                : removed
+                                    ? "removed"
+                                    : "modified",
+                    patch:
+                        GIT_PROVIDER === "github"
+                            ? file.patch
+                            : file.diff,
+                    
                     original,
                     modified
                 });
             }
 
             const prompt = buildPrompt(
-                pullRequest,
+                reviewData,
                 reviewFiles
             );
 
@@ -265,10 +280,8 @@ document
 
             // document.getElementById("result").innerText = review;
 
-            await postPullRequestComment(
-                pr.owner,
-                pr.repo,
-                pr.number,
+            await postReviewComment(
+                pr,
                 review
             );
 

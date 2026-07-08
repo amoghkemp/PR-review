@@ -1,22 +1,45 @@
 function buildPrompt(pullRequest, files) {
+    let repository;
+    let description;
+    let sourceBranch;
+    let targetBranch;
+
+    if (GIT_PROVIDER === "github") {
+        repository = pullRequest.base.repo.full_name;
+
+        description = pullRequest.body ?? "";
+
+        sourceBranch = pullRequest.head.ref;
+
+        targetBranch = pullRequest.base.ref;
+    }
+    else {
+        repository = pullRequest.references.full;
+
+        description = pullRequest.description ?? "";
+
+        sourceBranch = pullRequest.source_branch;
+
+        targetBranch = pullRequest.target_branch;
+    }
 
     let prompt = `
 You are a senior software engineer reviewing a pull request.
 
 Repository:
-${pullRequest.base.repo.full_name}
+${repository}
 
 Title:
 ${pullRequest.title}
 
 Description:
-${pullRequest.body ?? ""}
+${description}
 
 Target Branch:
-${pullRequest.base.ref}
+${targetBranch}
 
 Source Branch:
-${pullRequest.head.ref}
+${sourceBranch}
 
 Your Job is to identify only the important issues that another reviewer would care about.
 
