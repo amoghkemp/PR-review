@@ -35,7 +35,7 @@
     top: 0;
     left: 0;
 
-    width: 8px;
+    width: 4px;
     height: 100%;
 
     cursor: ew-resize;
@@ -116,6 +116,7 @@
 #ai-review-panel.collapsed #reviewButton,
 #ai-review-panel.collapsed #result,
 #ai-review-panel.collapsed #settingsButton,
+#ai-review-panel.collapsed #closeButton,
 #ai-review-panel.collapsed #settingsPanel {
 
     display:none;

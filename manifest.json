@@ -3,9 +3,14 @@
     "name": "AI PR Reviewer",
     "version": "1.0",
 
+    "action": {
+        "default_title": "AI PR Reviewer"
+    },
+
     "permissions": [
         "activeTab",
-        "storage"
+        "storage",
+        "scripting"
     ],
 
     "host_permissions": [
@@ -13,7 +18,9 @@
         "https://api.github.com/*",
 
         "https://gitlab.com/*",
-        "https://gitlab.com/api/*"
+        "https://gitlab.com/api/*",
+
+        "https://git.routematic.com/api/*"
     ],
 
     "background": {
@@ -24,7 +31,9 @@
         {
             "matches": [
                 "https://github.com/*/pull/*",
-                "https://gitlab.com/*/-/merge_requests/*"
+                "https://gitlab.com/*/-/merge_requests/*",
+
+                "https://git.routematic.com/*/-/merge_requests/*"
             ],
             "js": [
                 "config.js",
