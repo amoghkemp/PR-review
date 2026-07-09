@@ -1,4 +1,5 @@
 let GITLAB_TOKEN = "";
+let GITLAB_HOST = "";
 
 async function gitlabRequest(url) {
     console.log("Request:", url);
@@ -16,11 +17,14 @@ async function gitlabRequest(url) {
     return await response.json();
 }
 
-const base_url = "https://git.routematic.com";
 
 function parseMergeRequestURL(url) {
-    const match= url.match(
-        /git\.routematic\.com\/(.+)\/-\/merge_requests\/(\d+)/
+    const parsed = new URL(url);
+
+    GITLAB_HOST = parsed.origin;
+
+    const match = parsed.pathname.match(
+        /^\/(.+)\/-\/merge_requests\/(\d+)$/
     );
 
     if (!match) {
@@ -35,13 +39,13 @@ function parseMergeRequestURL(url) {
 
 async function getMergeRequest(project, number) {
     return gitlabRequest(
-        `${base_url}/api/v4/projects/${project}/merge_requests/${number}`
+        `${GITLAB_HOST}/api/v4/projects/${project}/merge_requests/${number}`
     );
 }
 
 async function getMergeRequestFiles(project, number) {
     const data = await gitlabRequest(
-        `${base_url}/api/v4/projects/${project}/merge_requests/${number}/changes`
+        `${GITLAB_HOST}/api/v4/projects/${project}/merge_requests/${number}/changes`
     );
 
     return data.changes;
@@ -51,7 +55,7 @@ async function getGitLabFile(project, path, ref) {
     const encoded = encodeURIComponent(path);
 
     return gitlabRequest(
-        `${base_url}/api/v4/projects/${project}/repository/files/${encoded}?ref=${encodeURIComponent(ref)}`
+        `${GITLAB_HOST}/api/v4/projects/${project}/repository/files/${encoded}?ref=${encodeURIComponent(ref)}`
     );
 }
 
@@ -65,7 +69,7 @@ function decodeGitLabContent(file) {
 
 async function postMergeRequestComment(project, number, body) {
     const response = await fetch (
-        `${base_url}/api/v4/projects/${project}/merge_requests/${number}/notes`,
+        `${GITLAB_HOST}/api/v4/projects/${project}/merge_requests/${number}/notes`,
 
         {
             method: "POST",

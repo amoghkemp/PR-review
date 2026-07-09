@@ -4,11 +4,8 @@ function detectGitProvider(url) {
     if (url.includes("github.com")) {
         GIT_PROVIDER = "github";
     }
-    else if (url.includes("gitlab.com")) {
-        GIT_PROVIDER = "gitlab";
-    }
     else {
-        throw new Error("Unsupported Git Provider");
+        GIT_PROVIDER = "gitlab";
     }
 }
 

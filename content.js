@@ -6,7 +6,6 @@ function destroyPanel() {
     if (panel) {
         panel.remove();
         panel = null;
-        resizeObserver.disconnect();
     }
 }
 
@@ -350,15 +349,18 @@ function createPanel() {
 
 // panel = createPanel(); // can uncomment to have panel pop up when you open a PR
 
-chrome.runtime.onMessage.addListener((message) => {
-    if (message.action !== "toggle-panel") {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "ping") {
+        sendResponse({ alive: true });
         return;
     }
 
-    if (panel === null) {
-        panel = createPanel();
-    }
-    else {
-        destroyPanel();
+    if (message.action === "toggle-panel") {
+        if (panel === null) {
+            panel = createPanel();
+        }
+        else {
+            destroyPanel();
+        }
     }
 });

@@ -147,24 +147,47 @@ Crisp: problem → why it bites (one clause, only if not obvious) → concrete f
 
 ## Output Format
 
-Return only this JSON (your extension parses it — inline comments + one summary):
+Return this text format (your extension parses it — inline comments + one summary):
 
-'''json
-{
-  "verdict": "approve | request_changes | needs_discussion",
-  "summary": "≤3 sentences: what the PR does, overall state, the single biggest risk if any.",
-  "context_confidence": "full | diff_only",
-  "comments": [
-    {
-      "path": "src/example/file.ext",
-      "line": 42,
-      "severity": "BLOCKER | MAJOR | MINOR | QUESTION | NIT",
-      "pillar": "correctness",
-      "comment": "Problem + fix, per Comment Style.",
-      "evidence": "file:line reference(s) backing the claim"
-    }
-  ]
-}
+'''
+Verdict: REQUEST CHANGES
+
+Summary
+-------
+This PR adds automatic AI review support for GitHub pull requests by fetching changed files and building a review context. The implementation is generally well structured, but there are a couple of issues that could cause incorrect behavior.
+
+Context Confidence
+------------------
+Full Repository Context
+
+Findings
+--------
+
+MAJOR
+-----
+github.js:58
+
+Pillar: Correctness
+
+Evidence:
+github.js:58
+
+The GitHub API response is assumed to always contain a 'patch'. Binary files and very large files often omit this field, which could cause downstream processing to behave unexpectedly. Handle missing patches explicitly before constructing the review prompt.
+
+MINOR
+-----
+context.js:124
+
+Pillar: Maintainability
+
+Evidence:
+context.js:124
+
+The prompt-building logic is becoming very large. Consider extracting the persona and review instructions into a separate template file to make future edits easier.
+
+Overall Recommendation
+----------------------
+Request Changes
 '''
 
 'line' is the line number in the new version of the file as shown in the diff. 'verdict' is 'request_changes' only if a BLOCKER or MAJOR exists; 'needs_discussion' when QUESTIONs dominate; otherwise 'approve'.

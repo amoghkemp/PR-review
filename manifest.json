@@ -18,36 +18,13 @@
         "https://api.github.com/*",
 
         "https://gitlab.com/*",
-        "https://gitlab.com/api/*",
-
-        "https://git.routematic.com/api/*"
+        "https://gitlab.com/api/*"
+    ],
+    "optional_host_permissions": [
+        "https://*/*"
     ],
 
     "background": {
         "service_worker": "background.js"
-    },
-
-    "content_scripts": [
-        {
-            "matches": [
-                "https://github.com/*/pull/*",
-                "https://gitlab.com/*/-/merge_requests/*",
-
-                "https://git.routematic.com/*/-/merge_requests/*"
-            ],
-            "js": [
-                "config.js",
-                "github.js",
-                "gitlab.js",
-                "git.js",
-                "promptBuilder.js",
-                "providers/gemini.js",
-                "llm.js",
-                "content.js"
-            ],
-            "css": [
-                "styles.css"
-            ]
-        }
-    ]
+    }
 }
