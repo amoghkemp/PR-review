@@ -17,16 +17,6 @@ const CONFIG = {
         anthropic: {
             apiKey: "",
             model: "claude-sonnet-4"
-        },
-
-        ollama: {
-            baseUrl: "http://localhost:11434",
-            model: "llama3.1"
-        },
-
-        openrouter: {
-            apiKey: "",
-            model: "anthropic/claude-sonnet-4"
         }
     }
 };
