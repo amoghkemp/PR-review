@@ -65,8 +65,45 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
     min-height: 36px;
+}
+
+#reviewButtonLabel {
+    text-align: center;
+}
+
+#reviewSpinner {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border: 3px solid #dbeafe;
+    border-top-color: #0969da;
+    border-radius: 50%;
+    box-sizing: border-box;
+    animation: spin 0.8s linear infinite;
+}
+
+#reviewActionRow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 0 12px 12px;
+}
+
+#reviewActionRow #reviewButton {
+    width: 100%;
+}
+
+#reviewSpinnerRow {
+    display: flex;
+    justify-content: center;
+    min-height: 18px;
+    width: 100%;
+}
+
+#reviewSpinnerRow #reviewSpinner {
+    flex: 0 0 auto;
 }
 
 #reviewButton:hover {
@@ -74,7 +111,7 @@
 }
 
 #reviewButton:disabled {
-    cursor: progress;
+    cursor: default;
     opacity: 0.85;
 }
 
@@ -204,6 +241,21 @@
     color: #0969da;
 }
 
+#settingsResultRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 18px;
+}
+
+#settingsResultRow .spinner {
+    flex: 0 0 auto;
+}
+
+#settingsResult {
+    flex: 1;
+}
+
 #settingsResult.error {
     color: #b42318;
 }
@@ -285,11 +337,6 @@ body {
 
 #autoPostContainer {
     padding: 10px 12px;
-}
-
-#reviewButton {
-    margin: 0 12px 12px;
-    width: calc(100% - 24px);
 }
 
 #result {
