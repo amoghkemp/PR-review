@@ -2,6 +2,24 @@ console.log("AI PR Reviewer loaded.");
 
 let panel = null;
 
+const MODEL_OPTIONS = {
+    gemini: [
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro"
+    ],
+    openai: [
+        "gpt-4.1-mini",
+        "gpt-4.1",
+        "gpt-4.1-nano"
+    ],
+    anthropic: [
+        "claude-sonnet-4",
+        "claude-opus-4",
+        "claude-haiku-4"
+    ]
+};
+
 function destroyPanel() {
     if (panel) {
         panel.remove();
@@ -9,8 +27,88 @@ function destroyPanel() {
     }
 }
 
+function setResult(message, isError = false) {
+    const result = document.getElementById("result");
+    if (!result) return;
+
+    result.classList.toggle("error", isError);
+    result.innerText = message;
+}
+
+function setSettingsResult(message, isError = false) {
+    const result = document.getElementById("settingsResult");
+    if (!result) return;
+
+    result.classList.toggle("error", isError);
+    result.innerText = message;
+}
+
+function clearSettingsResult() {
+    setSettingsResult("");
+}
+
+function setReviewLoading(isLoading) {
+    const reviewButton = document.getElementById("reviewButton");
+    const spinner = document.getElementById("reviewSpinner");
+    const label = document.getElementById("reviewButtonLabel");
+
+    if (!reviewButton || !spinner || !label) return;
+
+    reviewButton.disabled = isLoading;
+    reviewButton.classList.toggle("loading", isLoading);
+    spinner.classList.toggle("hidden", !isLoading);
+    label.innerText = isLoading ? "Reviewing..." : "Review PR";
+}
+
+function setSettingsMode(enabled) {
+    const panelElement = document.getElementById("ai-review-panel");
+    const settingsPanel = document.getElementById("settingsPanel");
+    const accountsPanel = document.getElementById("accountsPanel");
+    const autoPostContainer = document.getElementById("autoPostContainer");
+    const reviewButton = document.getElementById("reviewButton");
+    const result = document.getElementById("result");
+    const resizeHandle = document.getElementById("resizeHandle");
+
+    if (!panelElement || !settingsPanel) return;
+
+    panelElement.classList.toggle("settings-open", enabled);
+    settingsPanel.classList.toggle("hidden", !enabled);
+
+    if (accountsPanel) accountsPanel.classList.toggle("hidden", enabled);
+    if (autoPostContainer) autoPostContainer.classList.toggle("hidden", enabled);
+    if (reviewButton) reviewButton.classList.toggle("hidden", enabled);
+    if (result) result.classList.toggle("hidden", enabled);
+    if (resizeHandle) resizeHandle.classList.toggle("hidden", enabled);
+}
+
+function populateModelOptions(provider, selectedModel) {
+    const modelSelect = document.getElementById("model");
+    if (!modelSelect) return;
+
+    const models = MODEL_OPTIONS[provider] || [];
+    modelSelect.innerHTML = models
+        .map((model) => `<option value="${model}">${model}</option>`)
+        .join("");
+
+    if (selectedModel && models.includes(selectedModel)) {
+        modelSelect.value = selectedModel;
+    }
+}
+
+async function setGitlabTokenEditingEnabled(enabled) {
+    const tokenInput = document.getElementById("gitlabToken");
+
+    if (!tokenInput) return;
+
+    tokenInput.disabled = !enabled;
+    tokenInput.classList.toggle("disabledField", !enabled);
+}
+
 async function updateAccountUI() {
-    const settings = await chrome.storage.local.get("githubToken");
+    const settings = await chrome.storage.local.get([
+        "githubToken",
+        "gitlabToken"
+    ]);
     const gitlab = await getGitlabSession();
 
     const githubStatus = document.getElementById("githubStatus");
@@ -29,14 +127,26 @@ async function updateAccountUI() {
     const gitlabButton = document.getElementById("gitlabAuthButton");
 
     if (gitlab) {
-        gitlabStatus.innerText = "✓ " + gitlab.username;
+        const userLabel = gitlab.username ? ` ${gitlab.username}` : "";
+        gitlabStatus.innerText = `✓${userLabel}`;
         gitlabButton.innerText = "Sign Out";
+        await chrome.storage.local.remove("gitlabToken");
+        const tokenInput = document.getElementById("gitlabToken");
+        if (tokenInput) {
+            tokenInput.value = "";
+        }
+        await setGitlabTokenEditingEnabled(false);
+    }
+    else if (settings.gitlabToken) {
+        gitlabStatus.innerText = "✓ Token saved";
+        gitlabButton.innerText = "Clear Token";
+        await setGitlabTokenEditingEnabled(true);
     }
     else {
         gitlabStatus.innerText = "Not Signed In";
         gitlabButton.innerText = "Sign In";
+        await setGitlabTokenEditingEnabled(true);
     }
-
 }
 
 function createPanel() {
@@ -69,12 +179,23 @@ function createPanel() {
             <option value="anthropic">Anthropic</option>
         </select>
 
+        <label>Model</label>
+
+        <select id="model"></select>
+
         <label>Github token</label>
 
         <input
             id="githubToken"
             type="password"
             placeholder="Github Personal Access Token">
+
+        <label>Gitlab token</label>
+
+        <input
+            id="gitlabToken"
+            type="password"
+            placeholder="Gitlab Personal Access Token">
 
         <label>API Key</label>
 
@@ -86,6 +207,8 @@ function createPanel() {
         <button id="saveSettings">
             Save
         </button>
+
+        <div id="settingsResult"></div>
 
     </div>
 
@@ -121,7 +244,8 @@ function createPanel() {
     </label>
 
     <button id="reviewButton">
-        Review PR
+        <span id="reviewSpinner" class="spinner hidden"></span>
+        <span id="reviewButtonLabel">Review PR</span>
     </button>
 
     <div id="result"></div>
@@ -151,13 +275,19 @@ function createPanel() {
     (async function loadSettings() {
         const settings = await chrome.storage.local.get([
             "provider",
+            "model",
             "githubToken",
+            "gitlabToken",
             "apiKey",
             "autoPost"
         ]);
 
+        const provider = settings.provider || CONFIG.provider;
+        document.getElementById("provider").value = provider;
+        populateModelOptions(provider, settings.model || CONFIG.providers[provider].model);
+
         if (settings.provider) {
-            document.getElementById("provider").value = settings.provider;
+            CONFIG.provider = settings.provider;
         }
         if (settings.githubToken) {
             document.getElementById("githubToken").value =
@@ -165,8 +295,13 @@ function createPanel() {
         }
 
         if (settings.apiKey) {
-            document.getElementById("apiKey").value =
-                settings.apiKey;
+        document.getElementById("apiKey").value =
+            settings.apiKey;
+        }
+
+        if (settings.gitlabToken) {
+            document.getElementById("gitlabToken").value =
+                settings.gitlabToken;
         }
 
         document.getElementById("autoPost").checked = settings.autoPost ?? false;
@@ -174,6 +309,11 @@ function createPanel() {
     })();
 
     updateAccountUI();
+
+    document.getElementById("provider").addEventListener("change", (event) => {
+        populateModelOptions(event.target.value);
+        clearSettingsResult();
+    });
 
     // code for the button to collapse extension
     const toggleButton = document.getElementById("toggleButton");
@@ -197,7 +337,8 @@ function createPanel() {
     const settingsPanel = document.getElementById("settingsPanel");
 
     settingsButton.addEventListener("click", () => {
-        settingsPanel.classList.toggle("hidden");
+        const isHidden = settingsPanel.classList.contains("hidden");
+        setSettingsMode(isHidden);
     });
 
     // close button
@@ -212,11 +353,26 @@ function createPanel() {
         });
     });
 
+    [
+        "provider",
+        "model",
+        "githubToken",
+        "gitlabToken",
+        "apiKey"
+    ].forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+
+        element.addEventListener("input", clearSettingsResult);
+        element.addEventListener("change", clearSettingsResult);
+    });
+
     // Github Button logic
     document
         .getElementById("githubAuthButton")
         .addEventListener("click", async () => {
             settingsPanel.classList.remove("hidden");
+            setSettingsMode(true);
             document.getElementById("githubToken").focus();
         });
 
@@ -228,10 +384,22 @@ function createPanel() {
             console.log("Gitlab button clicked");
 
             const session = await getGitlabSession();
+            const settings = await chrome.storage.local.get("gitlabToken");
 
             if (session) {
                 console.log("Logging Out");
                 await clearGitlabSession();
+                await updateAccountUI();
+                setResult("Signed out of GitLab.");
+            }
+            else if (settings.gitlabToken) {
+                await chrome.storage.local.remove("gitlabToken");
+                const tokenInput = document.getElementById("gitlabToken");
+                if (tokenInput) {
+                    tokenInput.value = "";
+                }
+                await updateAccountUI();
+                setResult("GitLab token cleared.");
             }
             else {
                 const response = await chrome.runtime.sendMessage({
@@ -240,14 +408,22 @@ function createPanel() {
                 });
 
                 if (response?.success) {
+                    await chrome.storage.local.remove("gitlabToken");
+                    const tokenInput = document.getElementById("gitlabToken");
+                    if (tokenInput) {
+                        tokenInput.value = "";
+                    }
+                    setResult("Signed in to GitLab.");
                     await updateAccountUI();
                 }
                 else {
-                    console.error(response?.error);
+                    const message = response?.error || "GitLab sign-in failed.";
+                    console.error(message);
+                    setResult(message, true);
                 }
             }
 
-            updateAccountUI();
+            await updateAccountUI();
         });
 
     // resize handle
@@ -279,14 +455,20 @@ function createPanel() {
         .addEventListener("click", async () => {
             const settings = {
                 provider: document.getElementById("provider").value,
+                model: document.getElementById("model").value,
                 githubToken: document.getElementById("githubToken").value,
+                gitlabToken: document.getElementById("gitlabToken").value,
                 apiKey: document.getElementById("apiKey").value
             };
 
             console.log(settings);
 
             await chrome.storage.local.set(settings)
-            document.getElementById("result").innerText = "Settings saved successfully";
+            CONFIG.provider = settings.provider;
+            CONFIG.providers[settings.provider].model = settings.model;
+            CONFIG.providers[settings.provider].apiKey = settings.apiKey;
+            setSettingsResult("Settings saved successfully");
+            await updateAccountUI();
         });
 
     // for review button logic after clicking
@@ -295,55 +477,49 @@ function createPanel() {
         .addEventListener("click", async () => {
 
             console.log("Review button clicked");
-            document.getElementById("result").innerText = "Reviewing PR...";
-
-            const settings = await chrome.storage.local.get([
-                "provider",
-                "githubToken",
-                "apiKey",
-                "autoPost"
-            ]);
-
-            detectGitProvider(window.location.href);
-
-
-            if (!settings.apiKey) {
-                document.getElementById("result").innerText = "Please configure your LLM API key first.";
-                return;
-            }
-
-            if (GIT_PROVIDER === "github" && !settings.githubToken) {
-                document.getElementById("result").innerText = "Please configure your GitHub token.";
-                return;
-            }
-
-            if (GIT_PROVIDER === "gitlab") {
-                const session = await getGitlabSession();
-
-                console.log(await chrome.storage.local.get("gitlab"));
-
-                if (!session) {
-                    document.getElementById("result").innerText = "Please sign in to GitLab.";
-                    return;
-                }
-            }
-
-            console.log("Updating Git token");
-            if (GIT_PROVIDER === "github") {
-                GITHUB_TOKEN = settings.githubToken;
-            }
-            // else{
-            //     GITLAB_TOKEN = settings.gitToken;
-            // }
-            
-
-            console.log("Updating provider");
-            CONFIG.provider = settings.provider;
-
-            console.log("Updating API Key")
-            CONFIG.providers[settings.provider].apiKey = settings.apiKey;
+            setResult("Reviewing PR...");
+            setReviewLoading(true);
 
             try {
+                const settings = await chrome.storage.local.get([
+                    "provider",
+                    "githubToken",
+                    "gitlabToken",
+                    "apiKey",
+                    "autoPost"
+                ]);
+
+                detectGitProvider(window.location.href);
+
+                if (!settings.apiKey) {
+                    throw new Error("Please configure your LLM API key first.");
+                }
+
+                if (GIT_PROVIDER === "github" && !settings.githubToken) {
+                    throw new Error("Please configure your GitHub token.");
+                }
+
+                if (GIT_PROVIDER === "gitlab") {
+                    const session = await getGitlabSession();
+                    const hasGitlabToken = Boolean(settings.gitlabToken);
+
+                    if (!session && !hasGitlabToken) {
+                        throw new Error("Please sign in to GitLab or add a GitLab token.");
+                    }
+                }
+
+                console.log("Updating Git token");
+                if (GIT_PROVIDER === "github") {
+                    GITHUB_TOKEN = settings.githubToken;
+                }
+
+                console.log("Updating provider");
+                CONFIG.provider = settings.provider;
+
+                console.log("Updating API Key")
+                CONFIG.providers[settings.provider].apiKey = settings.apiKey;
+                CONFIG.providers[settings.provider].model = settings.model || CONFIG.providers[settings.provider].model;
+
                 const pr = parseReviewURL(window.location.href);
 
                 const reviewData = await getReview(pr);
@@ -424,10 +600,10 @@ function createPanel() {
                         review
                     );
 
-                    document.getElementById("result").innerText = review + "\n\n Review posted Successfully";
+                    setResult(review + "\n\nReview posted successfully");
                 }
                 else {
-                    document.getElementById("result").innerText = review;
+                    setResult(review);
 
                     document.getElementById("postCommentButton") ?.remove();
 
@@ -447,8 +623,10 @@ function createPanel() {
             }
             catch (error) {
                 console.error(error);
-
-                document.getElementById("result").innerText = error.message;
+                setResult(error.message || "Something went wrong while reviewing the PR.", true);
+            }
+            finally {
+                setReviewLoading(false);
             }
         });
     

@@ -62,10 +62,36 @@
     padding: 8px 12px;
     border-radius: 6px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
 }
 
 #reviewButton:hover {
     background: #2ea043;
+}
+
+#reviewButton:disabled {
+    cursor: progress;
+    opacity: 0.85;
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 #result {
@@ -78,6 +104,21 @@
 
     border-top: 1px solid #ddd;
     padding-top: 10px;
+}
+
+#ai-review-panel.settings-open {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#ai-review-panel.settings-open #header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+#result.error {
+    color: #b42318;
 }
 
 #header {
@@ -153,13 +194,50 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    margin: 0;
+    padding: 12px;
+}
+
+#settingsResult {
+    margin-top: 4px;
+    min-height: 18px;
+    color: #0969da;
+}
+
+#settingsResult.error {
+    color: #b42318;
 }
 
 #settingsPanel input,
 #settingsPanel select {
     padding: 6px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #fff;
+    color: #24292f;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#settingsPanel input:disabled,
+#settingsPanel input.disabledField {
+    background: #f3f4f6;
+    color: #8b949e;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+}
+
+#settingsPanel input:not(:disabled),
+#settingsPanel select {
+    background: #ffffff;
+    color: #111827;
+}
+
+#settingsPanel input:not(:disabled):focus,
+#settingsPanel select:focus {
+    outline: none;
+    border-color: #0969da;
+    box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
 }
 
 .hidden {
@@ -179,7 +257,7 @@ body {
 }
 
 #accountsPanel {
-    padding: 10px;
+    padding: 10px 12px;
     border-bottom: 1px solid #ddd;
 }
 
@@ -205,8 +283,35 @@ body {
     color: #666;
 }
 
+#autoPostContainer {
+    padding: 10px 12px;
+}
+
+#reviewButton {
+    margin: 0 12px 12px;
+    width: calc(100% - 24px);
+}
+
+#result {
+    margin: 0 12px 12px;
+}
+
 #accountsPanel h3,
 #settingsPanel h3 {
     color: #24292f;
     margin: 0 0 10px 0;
+}
+
+#saveSettings {
+    background: #238636;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
 }

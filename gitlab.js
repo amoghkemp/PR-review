@@ -1,20 +1,62 @@
 // let GITLAB_TOKEN = "";
 let GITLAB_HOST = "";
 
+async function getGitlabAuth() {
+    const session = await getGitlabSession();
+
+    if (session?.accessToken) {
+        return {
+            source: "oauth",
+            session,
+            headerName: "Authorization",
+            headerValue: `Bearer ${session.accessToken}`
+        };
+    }
+
+    const { gitlabToken } = await chrome.storage.local.get("gitlabToken");
+
+    if (gitlabToken) {
+        return {
+            source: "token",
+            headerName: "PRIVATE-TOKEN",
+            headerValue: gitlabToken
+        };
+    }
+
+    throw new Error("Please sign in to GitLab or configure a GitLab token.");
+}
+
 async function gitlabRequest(url) {
     console.log("Request:", url);
 
-    const session = await getGitlabSession();
-
-    if (!session) {
-        throw new Error("Not signed into Gitlab.");
-    }
-
+    const auth = await getGitlabAuth();
     const response = await fetch(url, {
         headers: {
-            Authorization: `Bearer ${session.accessToken}`
+            [auth.headerName]: auth.headerValue
         }
     });
+
+    if (response.status === 401 && auth.source === "oauth" && auth.session?.refreshToken) {
+        const refreshed = await chrome.runtime.sendMessage({
+            action: "gitlab-refresh-session",
+            session: auth.session
+        });
+
+        if (refreshed?.success) {
+            const refreshedAuth = await getGitlabAuth();
+            const retryResponse = await fetch(url, {
+                headers: {
+                    [refreshedAuth.headerName]: refreshedAuth.headerValue
+                }
+            });
+
+            if (!retryResponse.ok) {
+                throw new Error(await retryResponse.text());
+            }
+
+            return await retryResponse.json();
+        }
+    }
 
     if (!response.ok) {
         throw new Error(await response.text());
@@ -74,11 +116,7 @@ function decodeGitLabContent(file) {
 }
 
 async function postMergeRequestComment(project, number, body) {
-    const session = await getGitlabSession();
-
-    if (!session) {
-        throw new Error("Not signed into Gitlab.");
-    }
+    const auth = await getGitlabAuth();
 
     const response = await fetch (
         `${GITLAB_HOST}/api/v4/projects/${project}/merge_requests/${number}/notes`,
@@ -87,7 +125,7 @@ async function postMergeRequestComment(project, number, body) {
             method: "POST",
 
             headers: {
-                Authorization: `Bearer ${session.accessToken}`,
+                [auth.headerName]: auth.headerValue,
                 "Content-Type": "application/json"
             },
 
