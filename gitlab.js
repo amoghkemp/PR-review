@@ -1,12 +1,18 @@
-let GITLAB_TOKEN = "";
+// let GITLAB_TOKEN = "";
 let GITLAB_HOST = "";
 
 async function gitlabRequest(url) {
     console.log("Request:", url);
 
+    const session = await getGitlabSession();
+
+    if (!session) {
+        throw new Error("Not signed into Gitlab.");
+    }
+
     const response = await fetch(url, {
         headers: {
-            "PRIVATE-TOKEN": GITLAB_TOKEN
+            Authorization: `Bearer ${session.accessToken}`
         }
     });
 
@@ -68,6 +74,12 @@ function decodeGitLabContent(file) {
 }
 
 async function postMergeRequestComment(project, number, body) {
+    const session = await getGitlabSession();
+
+    if (!session) {
+        throw new Error("Not signed into Gitlab.");
+    }
+
     const response = await fetch (
         `${GITLAB_HOST}/api/v4/projects/${project}/merge_requests/${number}/notes`,
 
@@ -75,7 +87,7 @@ async function postMergeRequestComment(project, number, body) {
             method: "POST",
 
             headers: {
-                "PRIVATE-TOKEN": GITLAB_TOKEN,
+                Authorization: `Bearer ${session.accessToken}`,
                 "Content-Type": "application/json"
             },
 

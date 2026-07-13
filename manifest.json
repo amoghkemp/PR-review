@@ -8,8 +8,9 @@
     },
 
     "permissions": [
-        "activeTab",
         "storage",
+        "identity",
+        "activeTab",
         "scripting"
     ],
 

@@ -9,6 +9,36 @@ function destroyPanel() {
     }
 }
 
+async function updateAccountUI() {
+    const settings = await chrome.storage.local.get("githubToken");
+    const gitlab = await getGitlabSession();
+
+    const githubStatus = document.getElementById("githubStatus");
+    const githubButton = document.getElementById("githubAuthButton");
+
+    if (settings.githubToken) {
+        githubStatus.innerText = "✓ Configured";
+        githubButton.innerText = "Change";
+    }
+    else {
+        githubStatus.innerText = "Not Configured";
+        githubButton.innerText = "Add Token";
+    }
+
+    const gitlabStatus = document.getElementById("gitlabStatus");
+    const gitlabButton = document.getElementById("gitlabAuthButton");
+
+    if (gitlab) {
+        gitlabStatus.innerText = "✓ " + gitlab.username;
+        gitlabButton.innerText = "Sign Out";
+    }
+    else {
+        gitlabStatus.innerText = "Not Signed In";
+        gitlabButton.innerText = "Sign In";
+    }
+
+}
+
 function createPanel() {
     const newPanel = document.createElement("div");
 
@@ -39,12 +69,12 @@ function createPanel() {
             <option value="anthropic">Anthropic</option>
         </select>
 
-        <label>Git token</label>
+        <label>Github token</label>
 
         <input
-            id="gitToken"
+            id="githubToken"
             type="password"
-            placeholder="Git Personal Access Token">
+            placeholder="Github Personal Access Token">
 
         <label>API Key</label>
 
@@ -57,6 +87,30 @@ function createPanel() {
             Save
         </button>
 
+    </div>
+
+    <div id="accountsPanel">
+        <h3>Accounts</h3>
+
+        <div class="accountRow">
+            <span>Github</span>
+
+            <span id="githubStatus">Add Token</span>
+
+            <button id="githubAuthButton">
+                Sign In
+            </button>
+        </div>
+
+        <div class="accountRow">
+            <span>GitLab</span>
+
+            <span id="gitlabStatus">Not signed In</span>
+
+            <button id="gitlabAuthButton">
+                Sign In
+            </button>
+        </div>
     </div>
 
     <label id="autoPostContainer">
@@ -97,7 +151,7 @@ function createPanel() {
     (async function loadSettings() {
         const settings = await chrome.storage.local.get([
             "provider",
-            "gitToken",
+            "githubToken",
             "apiKey",
             "autoPost"
         ]);
@@ -105,9 +159,9 @@ function createPanel() {
         if (settings.provider) {
             document.getElementById("provider").value = settings.provider;
         }
-        if (settings.gitToken) {
-            document.getElementById("gitToken").value =
-                settings.gitToken;
+        if (settings.githubToken) {
+            document.getElementById("githubToken").value =
+                settings.githubToken;
         }
 
         if (settings.apiKey) {
@@ -118,6 +172,8 @@ function createPanel() {
         document.getElementById("autoPost").checked = settings.autoPost ?? false;
 
     })();
+
+    updateAccountUI();
 
     // code for the button to collapse extension
     const toggleButton = document.getElementById("toggleButton");
@@ -156,6 +212,44 @@ function createPanel() {
         });
     });
 
+    // Github Button logic
+    document
+        .getElementById("githubAuthButton")
+        .addEventListener("click", async () => {
+            settingsPanel.classList.remove("hidden");
+            document.getElementById("githubToken").focus();
+        });
+
+    // Gitlab Button logic
+    document
+        .getElementById("gitlabAuthButton")
+        .addEventListener("click", async () => {
+
+            console.log("Gitlab button clicked");
+
+            const session = await getGitlabSession();
+
+            if (session) {
+                console.log("Logging Out");
+                await clearGitlabSession();
+            }
+            else {
+                const response = await chrome.runtime.sendMessage({
+                    action: "gitlab-login",
+                    host: window.location.hostname
+                });
+
+                if (response?.success) {
+                    await updateAccountUI();
+                }
+                else {
+                    console.error(response?.error);
+                }
+            }
+
+            updateAccountUI();
+        });
+
     // resize handle
     const resizeHandle = document.getElementById("resizeHandle");
 
@@ -185,7 +279,7 @@ function createPanel() {
         .addEventListener("click", async () => {
             const settings = {
                 provider: document.getElementById("provider").value,
-                gitToken: document.getElementById("gitToken").value,
+                githubToken: document.getElementById("githubToken").value,
                 apiKey: document.getElementById("apiKey").value
             };
 
@@ -205,28 +299,42 @@ function createPanel() {
 
             const settings = await chrome.storage.local.get([
                 "provider",
-                "gitToken",
+                "githubToken",
                 "apiKey",
                 "autoPost"
             ]);
 
+            detectGitProvider(window.location.href);
 
-            if (!settings.gitToken || !settings.apiKey) {
 
-                document.getElementById("result").innerText =
-                    "Please configure your settings first.";
-
+            if (!settings.apiKey) {
+                document.getElementById("result").innerText = "Please configure your LLM API key first.";
                 return;
             }
 
+            if (GIT_PROVIDER === "github" && !settings.githubToken) {
+                document.getElementById("result").innerText = "Please configure your GitHub token.";
+                return;
+            }
+
+            if (GIT_PROVIDER === "gitlab") {
+                const session = await getGitlabSession();
+
+                console.log(await chrome.storage.local.get("gitlab"));
+
+                if (!session) {
+                    document.getElementById("result").innerText = "Please sign in to GitLab.";
+                    return;
+                }
+            }
+
             console.log("Updating Git token");
-            detectGitProvider(window.location.href);
             if (GIT_PROVIDER === "github") {
-                GITHUB_TOKEN = settings.gitToken;
+                GITHUB_TOKEN = settings.githubToken;
             }
-            else{
-                GITLAB_TOKEN = settings.gitToken;
-            }
+            // else{
+            //     GITLAB_TOKEN = settings.gitToken;
+            // }
             
 
             console.log("Updating provider");
@@ -346,8 +454,6 @@ function createPanel() {
     
     return newPanel;
 }
-
-// panel = createPanel(); // can uncomment to have panel pop up when you open a PR
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "ping") {

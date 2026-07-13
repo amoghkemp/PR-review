@@ -177,3 +177,36 @@
 body {
     transition: margin-right .25s ease;
 }
+
+#accountsPanel {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.accountRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+}
+
+.accountRow span:first-child {
+    width: 70px;
+}
+
+.accountRow button {
+    margin-left: auto;
+}
+
+#githubStatus,
+#gitlabStatus {
+    flex: 1;
+    margin-left: 10px;
+    color: #666;
+}
+
+#accountsPanel h3,
+#settingsPanel h3 {
+    color: #24292f;
+    margin: 0 0 10px 0;
+}
