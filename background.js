@@ -5,13 +5,13 @@ const GITLAB_OAUTH = {
 };
 
 async function ensurePermission(origin) {
-    const hasPermission = await chrome.permissions.contains({
-        origins: [origin]
-    });
+    // const hasPermission = await chrome.permissions.contains({
+    //     origins: [origin]
+    // });
 
-    if (hasPermission) {
-        return true;
-    }
+    // if (hasPermission) {
+    //     return true;
+    // }
 
     return await chrome.permissions.request({
         origins: [origin]

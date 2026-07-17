@@ -43,20 +43,31 @@ function setSettingsResult(message, isError = false) {
     result.innerText = message;
 }
 
+function setSettingsSaving(isSaving) {
+    const spinner = document.getElementById("settingsSpinner");
+    if (!spinner) return;
+
+    spinner.classList.toggle("hidden", !isSaving);
+}
+
 function clearSettingsResult() {
     setSettingsResult("");
+    setSettingsSaving(false);
 }
 
 function setReviewLoading(isLoading) {
     const reviewButton = document.getElementById("reviewButton");
+    const spinnerRow = document.getElementById("reviewSpinnerRow");
     const spinner = document.getElementById("reviewSpinner");
     const label = document.getElementById("reviewButtonLabel");
 
-    if (!reviewButton || !spinner || !label) return;
+    if (!reviewButton || !spinnerRow || !spinner || !label) return;
 
     reviewButton.disabled = isLoading;
     reviewButton.classList.toggle("loading", isLoading);
+    spinnerRow.classList.toggle("hidden", !isLoading);
     spinner.classList.toggle("hidden", !isLoading);
+    spinner.setAttribute("aria-hidden", String(!isLoading));
     label.innerText = isLoading ? "Reviewing..." : "Review PR";
 }
 
@@ -208,7 +219,10 @@ function createPanel() {
             Save
         </button>
 
-        <div id="settingsResult"></div>
+        <div id="settingsResultRow">
+            <span id="settingsSpinner" class="spinner hidden"></span>
+            <div id="settingsResult"></div>
+        </div>
 
     </div>
 
@@ -243,10 +257,14 @@ function createPanel() {
             type="checkbox">
     </label>
 
-    <button id="reviewButton">
-        <span id="reviewSpinner" class="spinner hidden"></span>
-        <span id="reviewButtonLabel">Review PR</span>
-    </button>
+    <div id="reviewActionRow">
+        <button id="reviewButton">
+            <span id="reviewButtonLabel">Review PR</span>
+        </button>
+        <div id="reviewSpinnerRow" class="hidden">
+            <span id="reviewSpinner" class="hidden" aria-hidden="true"></span>
+        </div>
+    </div>
 
     <div id="result"></div>
     <div id="resizeHandle"></div>
@@ -463,10 +481,14 @@ function createPanel() {
 
             console.log(settings);
 
+            setSettingsResult("");
+            setSettingsSaving(true);
+
             await chrome.storage.local.set(settings)
             CONFIG.provider = settings.provider;
             CONFIG.providers[settings.provider].model = settings.model;
             CONFIG.providers[settings.provider].apiKey = settings.apiKey;
+            setSettingsSaving(false);
             setSettingsResult("Settings saved successfully");
             await updateAccountUI();
         });
@@ -525,6 +547,12 @@ function createPanel() {
                 const reviewData = await getReview(pr);
 
                 const files = await getReviewFiles(pr);
+                const repositoryFiles = await getRepositoryFiles(
+                    pr,
+                    GIT_PROVIDER === "github"
+                        ? reviewData.base.sha
+                        : reviewData.diff_refs.base_sha
+                );
 
                 const reviewFiles = [];
 
@@ -583,7 +611,8 @@ function createPanel() {
 
                 const prompt = buildPrompt(
                     reviewData,
-                    reviewFiles
+                    reviewFiles,
+                    repositoryFiles
                 );
 
                 console.log(prompt);

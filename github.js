@@ -47,6 +47,12 @@ async function getChangedFiles(owner, repo, number) {
     );
 }
 
+async function getRepositoryTree(owner, repo, ref) {
+    return githubRequest(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`
+    );
+}
+
 async function getFile(owner, repo, path, ref) {
     const encoded = path
         .split("/")
@@ -56,6 +62,32 @@ async function getFile(owner, repo, path, ref) {
     return githubRequest(
         `https://api.github.com/repos/${owner}/${repo}/contents/${encoded}?ref=${ref}`
     );
+}
+
+async function getGithubRepositoryFiles(owner, repo, ref) {
+    const tree = await getRepositoryTree(owner, repo, ref);
+    const entries = tree.tree ?? [];
+    const files = [];
+
+    for (const entry of entries) {
+        if (entry.type !== "blob" || !entry.path) {
+            continue;
+        }
+
+        const data = await getFile(owner, repo, entry.path, ref);
+        const content = decodeContent(data);
+
+        if (content === null) {
+            continue;
+        }
+
+        files.push({
+            path: entry.path,
+            content
+        });
+    }
+
+    return files;
 }
 
 function decodeContent(file) {

@@ -27,10 +27,20 @@ async function getGitlabAuth() {
 }
 
 async function gitlabRequest(url) {
+    const response = await gitlabFetch(url);
+
+    if (!response.ok) {
+        throw new Error(await response.text());
+    }
+
+    return await response.json();
+}
+
+async function gitlabFetch(url) {
     console.log("Request:", url);
 
     const auth = await getGitlabAuth();
-    const response = await fetch(url, {
+    let response = await fetch(url, {
         headers: {
             [auth.headerName]: auth.headerValue
         }
@@ -44,25 +54,17 @@ async function gitlabRequest(url) {
 
         if (refreshed?.success) {
             const refreshedAuth = await getGitlabAuth();
-            const retryResponse = await fetch(url, {
+            response = await fetch(url, {
                 headers: {
                     [refreshedAuth.headerName]: refreshedAuth.headerValue
                 }
             });
 
-            if (!retryResponse.ok) {
-                throw new Error(await retryResponse.text());
-            }
-
-            return await retryResponse.json();
+            return response;
         }
     }
 
-    if (!response.ok) {
-        throw new Error(await response.text());
-    }
-
-    return await response.json();
+    return response;
 }
 
 
@@ -105,6 +107,53 @@ async function getGitLabFile(project, path, ref) {
     return gitlabRequest(
         `${GITLAB_HOST}/api/v4/projects/${project}/repository/files/${encoded}?ref=${encodeURIComponent(ref)}`
     );
+}
+
+async function getGitlabRepositoryFiles(project, ref) {
+    const files = [];
+    let page = 1;
+
+    while (true) {
+        const response = await gitlabFetch(
+            `${GITLAB_HOST}/api/v4/projects/${project}/repository/tree?ref=${encodeURIComponent(ref)}&recursive=true&per_page=100&page=${page}`
+        );
+
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+
+        const entries = await response.json();
+
+        for (const entry of entries) {
+            if (entry.type !== "blob" || !entry.path) {
+                continue;
+            }
+
+            const data = await getGitLabFile(project, entry.path, ref);
+            const content = decodeGitLabContent(data);
+
+            if (content === null) {
+                continue;
+            }
+
+            files.push({
+                path: entry.path,
+                content
+            });
+        }
+
+        const nextPage = response.headers.get("X-Next-Page");
+        if (!nextPage) {
+            break;
+        }
+
+        page = Number(nextPage);
+        if (!page) {
+            break;
+        }
+    }
+
+    return files;
 }
 
 function decodeGitLabContent(file) {

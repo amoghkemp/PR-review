@@ -64,6 +64,21 @@ async function getReviewFile(p, path, ref) {
     );
 }
 
+async function getRepositoryFiles(p, ref) {
+    if (GIT_PROVIDER === "github") {
+        return getGithubRepositoryFiles(
+            p.owner,
+            p.repo,
+            ref
+        );
+    }
+
+    return getGitlabRepositoryFiles(
+        p.project,
+        ref
+    );
+}
+
 function decodeFile(data) {
     if (GIT_PROVIDER === "github") {
         return decodeContent(data);
